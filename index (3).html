@@ -1,0 +1,3348 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TransitOps — Fleet Dispatch Board</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root {
+            --bg: #14171a;
+            --panel: #1b1f24;
+            --panel-2: #20252b;
+            --line: #2c3238;
+            --text: #e8e6e1;
+            --muted: #8b9198;
+            --amber: #f2a93b;
+            --amber-dim: #3a2f1c;
+            --green: #4cae6d;
+            --green-dim: #1c3324;
+            --red: #e4573d;
+            --red-dim: #3a2119;
+            --blue: #5c9ee0;
+            --purple: #b366cc;
+            --radius: 3px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+        }
+
+        .mono {
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        h1,
+        h2,
+        h3,
+        .display {
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            margin: 0;
+        }
+
+        /* ========== AUTH MODAL ========== */
+        .auth-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .auth-box {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            padding: 40px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        }
+
+        .auth-header {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .auth-header .logo {
+            font-family: 'Oswald', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--amber);
+            letter-spacing: 0.03em;
+        }
+
+        .auth-header .version {
+            color: var(--muted);
+            font-size: 11px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .auth-box h2 {
+            font-size: 18px;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        .auth-box .subtitle {
+            color: var(--muted);
+            font-size: 12px;
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--muted);
+            margin-bottom: 6px;
+            font-family: 'Oswald', sans-serif;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            background: var(--panel-2);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            padding: 10px 12px;
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--amber);
+            box-shadow: 0 0 0 2px rgba(242, 169, 59, 0.1);
+        }
+
+        .demo-creds {
+            background: var(--panel-2);
+            border-left: 3px solid var(--blue);
+            padding: 12px 14px;
+            margin-bottom: 20px;
+            border-radius: 2px;
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .demo-creds .cred {
+            margin: 4px 0;
+        }
+
+        .demo-creds strong {
+            color: var(--blue);
+            font-weight: 600;
+        }
+
+        .btn-login {
+            width: 100%;
+            background: var(--amber);
+            color: #14171a;
+            border: none;
+            border-radius: var(--radius);
+            padding: 11px;
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 12px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .btn-login:hover {
+            opacity: 0.9;
+        }
+
+        .btn-login:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .auth-error {
+            color: var(--red);
+            font-size: 12px;
+            margin-bottom: 16px;
+            padding: 8px 10px;
+            background: var(--red-dim);
+            border-radius: var(--radius);
+            display: none;
+        }
+
+        .auth-error.show {
+            display: block;
+        }
+
+        .password-strength {
+            margin-top: 4px;
+            height: 4px;
+            background: var(--line);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .password-strength-bar {
+            height: 100%;
+            background: var(--red);
+            width: 0%;
+            transition: all 0.3s;
+        }
+
+        .password-strength-bar.weak {
+            background: var(--red);
+            width: 33%;
+        }
+
+        .password-strength-bar.medium {
+            background: var(--amber);
+            width: 66%;
+        }
+
+        .password-strength-bar.strong {
+            background: var(--green);
+            width: 100%;
+        }
+
+        .remember-me {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .remember-me input {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .remember-me label {
+            color: var(--muted);
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .session-timeout-warning {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--red-dim);
+            border: 2px solid var(--red);
+            border-radius: 4px;
+            padding: 20px 30px;
+            z-index: 10000;
+            text-align: center;
+            display: none;
+            min-width: 300px;
+        }
+
+        .session-timeout-warning.show {
+            display: block;
+        }
+
+        .session-timeout-warning h3 {
+            color: var(--red);
+            margin-bottom: 10px;
+        }
+
+        .session-timeout-warning p {
+            color: var(--muted);
+            font-size: 12px;
+            margin-bottom: 16px;
+        }
+
+        .countdown {
+            color: var(--amber);
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .timeout-btn {
+            margin: 0 6px;
+            padding: 6px 14px;
+            background: var(--red);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-family: 'Oswald', sans-serif;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+
+        .timeout-btn:hover {
+            opacity: 0.9;
+        }
+
+        .timeout-btn.secondary {
+            background: transparent;
+            border: 1px solid var(--line);
+            color: var(--text);
+        }
+
+        /* ========== TOP BAR ========== */
+        .topbar {
+            background: var(--panel);
+            border-bottom: 1px solid var(--line);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            font-family: 'Oswald', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--amber);
+            letter-spacing: 0.03em;
+        }
+
+        .user-info {
+            font-size: 12px;
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-name {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .logout-btn {
+            background: var(--red);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            transition: opacity 0.2s;
+        }
+
+        .logout-btn:hover {
+            opacity: 0.9;
+        }
+
+        /* ========== SIDEBAR ========== */
+        .sidebar {
+            width: 180px;
+            background: var(--panel);
+            border-right: 1px solid var(--line);
+            padding: 12px 0;
+            position: fixed;
+            top: 46px;
+            left: 0;
+            height: calc(100vh - 46px);
+            overflow-y: auto;
+        }
+
+        .nav-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 10px 14px;
+            background: transparent;
+            border: none;
+            border-left: 3px solid transparent;
+            color: var(--muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Oswald', sans-serif;
+            font-weight: 500;
+        }
+
+        .nav-btn:hover {
+            background: var(--panel-2);
+            color: var(--text);
+        }
+
+        .nav-btn.active {
+            background: var(--panel-2);
+            border-left-color: var(--amber);
+            color: var(--amber);
+        }
+
+        .nav-btn.restricted {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .nav-icon {
+            font-size: 14px;
+            width: 16px;
+        }
+
+        /* ========== MAIN ========== */
+        .main-wrapper {
+            margin-left: 180px;
+            margin-top: 46px;
+            padding: 20px;
+            min-height: calc(100vh - 66px);
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        /* ========== PANELS & CARDS ========== */
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .panel-header h2 {
+            font-size: 14px;
+        }
+
+        .status-badge {
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-alert {
+            background: var(--red-dim);
+            color: var(--red);
+        }
+
+        .badge-warning {
+            background: var(--amber-dim);
+            color: var(--amber);
+        }
+
+        .badge-success {
+            background: var(--green-dim);
+            color: var(--green);
+        }
+
+        /* ========== TABLES ========== */
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        thead {
+            background: var(--panel-2);
+            border-bottom: 2px solid var(--line);
+        }
+
+        th {
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        td {
+            padding: 10px;
+            border-bottom: 1px solid var(--line);
+            color: var(--text);
+        }
+
+        tbody tr:hover {
+            background: var(--panel-2);
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: var(--panel-2);
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .pill.active-driver {
+            color: var(--green);
+        }
+
+        .pill.suspended {
+            color: var(--red);
+            background: var(--red-dim);
+        }
+
+        .pill.expired {
+            color: var(--red);
+            background: var(--red-dim);
+        }
+
+        .pill.expired-license {
+            color: var(--red);
+            background: var(--red-dim);
+        }
+
+        .pill.pending {
+            color: var(--amber);
+            background: var(--amber-dim);
+        }
+
+        .pill.paid {
+            color: var(--green);
+            background: var(--green-dim);
+        }
+
+        .pill.unpaid {
+            color: var(--red);
+            background: var(--red-dim);
+        }
+
+        .lamp {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        /* ========== FORMS ========== */
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .form-row.full {
+            grid-template-columns: 1fr;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--muted);
+            margin-bottom: 4px;
+            font-family: 'Oswald', sans-serif;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            background: var(--panel-2);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            padding: 8px 10px;
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--amber);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        /* ========== BUTTONS ========== */
+        .btn {
+            padding: 8px 14px;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            font-family: 'Oswald', sans-serif;
+        }
+
+        .btn-primary {
+            background: var(--amber);
+            color: #14171a;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        .btn-danger {
+            background: var(--red);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            opacity: 0.9;
+        }
+
+        .btn-success {
+            background: var(--green);
+            color: white;
+        }
+
+        .btn-success:hover {
+            opacity: 0.9;
+        }
+
+        .btn-secondary {
+            background: var(--panel-2);
+            color: var(--text);
+            border: 1px solid var(--line);
+        }
+
+        .btn-secondary:hover {
+            background: var(--line);
+        }
+
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 10px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 6px;
+        }
+
+        /* ========== ALERTS ========== */
+        .alert {
+            padding: 10px 12px;
+            border-radius: var(--radius);
+            margin-bottom: 12px;
+            font-size: 12px;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-success {
+            background: var(--green-dim);
+            color: var(--green);
+            border-left: 3px solid var(--green);
+        }
+
+        .alert-danger {
+            background: var(--red-dim);
+            color: var(--red);
+            border-left: 3px solid var(--red);
+        }
+
+        .alert-warning {
+            background: var(--amber-dim);
+            color: var(--amber);
+            border-left: 3px solid var(--amber);
+        }
+
+        .alert-info {
+            background: rgba(92, 158, 224, 0.1);
+            color: var(--blue);
+            border-left: 3px solid var(--blue);
+        }
+
+        /* ========== CHARTS ========== */
+        .chart-container {
+            position: relative;
+            height: 250px;
+            margin-bottom: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--panel-2);
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            padding: 12px;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--amber);
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        /* ========== MODAL ========== */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            padding: 20px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .modal-header h3 {
+            font-size: 14px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--muted);
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        .modal-close:hover {
+            color: var(--text);
+        }
+
+        /* ========== PAYMENT MODAL ========== */
+        .payment-form {
+            margin-top: 16px;
+        }
+
+        .payment-method {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: var(--panel-2);
+            border-radius: var(--radius);
+            margin-bottom: 8px;
+            cursor: pointer;
+        }
+
+        .payment-method input {
+            cursor: pointer;
+        }
+
+        .payment-method label {
+            cursor: pointer;
+        }
+
+        .payment-summary {
+            background: var(--panel-2);
+            border: 1px solid var(--line);
+            padding: 10px;
+            border-radius: var(--radius);
+            margin-bottom: 16px;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 12px;
+        }
+
+        .summary-total {
+            border-top: 1px solid var(--line);
+            padding-top: 8px;
+            margin-top: 8px;
+            font-weight: 600;
+            color: var(--amber);
+        }
+
+        .upi-qr-box {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            background: var(--panel-2);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-top: 8px;
+            margin-bottom: 8px;
+        }
+
+        .upi-qr-box.active {
+            display: flex;
+        }
+
+        .upi-qr-code {
+            background: #fff;
+            padding: 10px;
+            border-radius: 4px;
+            line-height: 0;
+        }
+
+        .upi-qr-id {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 12px;
+            color: var(--text);
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            padding: 6px 10px;
+        }
+
+        .upi-qr-hint {
+            font-size: 11px;
+            color: var(--muted);
+            text-align: center;
+        }
+
+        .upi-qr-amount {
+            font-family: 'Oswald', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--amber);
+        }
+
+        /* ========== DRIVER CLEANUP ========== */
+        .driver-cleanup-section {
+            background: var(--panel-2);
+            border-left: 3px solid var(--red);
+            padding: 12px;
+            border-radius: 2px;
+            margin-bottom: 16px;
+        }
+
+        .cleanup-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .cleanup-count {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 8px;
+        }
+
+        .cleanup-count strong {
+            color: var(--red);
+        }
+
+        /* ========== INSURANCE ========== */
+        .insurance-alert {
+            background: var(--red-dim);
+            border-left: 3px solid var(--red);
+            padding: 12px;
+            border-radius: 2px;
+            margin-bottom: 16px;
+            font-size: 12px;
+        }
+
+        .insurance-alert.warning {
+            background: var(--amber-dim);
+            border-left-color: var(--amber);
+        }
+
+        .insurance-alert.success {
+            background: var(--green-dim);
+            border-left-color: var(--green);
+        }
+
+        .insurance-card {
+            background: var(--panel-2);
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+
+        .insurance-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .insurance-card-title {
+            font-weight: 600;
+            color: var(--text);
+            font-size: 12px;
+        }
+
+        .insurance-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: var(--green-dim);
+            color: var(--green);
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .insurance-status.expired {
+            background: var(--red-dim);
+            color: var(--red);
+        }
+
+        .insurance-status.expiring-soon {
+            background: var(--amber-dim);
+            color: var(--amber);
+        }
+
+        .insurance-details {
+            font-size: 11px;
+            color: var(--muted);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .detail-label {
+            color: var(--muted);
+        }
+
+        .detail-value {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .insurance-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .insurance-status-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .insurance-stat-card {
+            background: var(--panel-2);
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .insurance-stat-label {
+            font-size: 10px;
+            color: var(--muted);
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .insurance-stat-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--amber);
+        }
+
+        .claim-record {
+            background: var(--panel-2);
+            border-left: 3px solid var(--blue);
+            padding: 10px;
+            border-radius: 2px;
+            margin-bottom: 8px;
+            font-size: 11px;
+        }
+
+        .claim-status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .claim-status.pending {
+            background: var(--amber-dim);
+            color: var(--amber);
+        }
+
+        .claim-status.approved {
+            background: var(--green-dim);
+            color: var(--green);
+        }
+
+        .claim-status.rejected {
+            background: var(--red-dim);
+            color: var(--red);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ========== AUTH ========== -->
+    <div class="auth-container" id="authContainer">
+        <div class="auth-box">
+            <div class="auth-header">
+                <div class="logo">TRANSITOPS</div>
+                <div class="version">v2.5</div>
+            </div>
+            <h2>Fleet Management Login</h2>
+            <p class="subtitle">Secure access to dispatch operations</p>
+            <div class="demo-creds">
+                <div class="cred"><strong>Admin:</strong> admin / password</div>
+                <div class="cred"><strong>Manager:</strong> manager / password</div>
+                <div class="cred"><strong>Driver:</strong> driver / password</div>
+            </div>
+            <div class="auth-error" id="authError"></div>
+            <div class="form-group">
+                <label>Role</label>
+                <select id="roleSelect">
+                    <option value="admin">Administrator</option>
+                    <option value="manager">Operations Manager</option>
+                    <option value="driver">Driver</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="username" placeholder="Enter username">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="password" placeholder="Enter password">
+                <div class="password-strength">
+                    <div class="password-strength-bar" id="strengthBar"></div>
+                </div>
+            </div>
+            <div class="remember-me">
+                <input type="checkbox" id="rememberMe">
+                <label>Remember login</label>
+            </div>
+            <button class="btn-login" onclick="handleLogin()">Login</button>
+        </div>
+    </div>
+
+    <!-- ========== SESSION TIMEOUT WARNING ========== -->
+    <div class="session-timeout-warning" id="timeoutWarning">
+        <h3>Session Ending</h3>
+        <p>Your session will expire in</p>
+        <div class="countdown" id="countdown">60</div>
+        <button class="timeout-btn" onclick="extendSession()">Continue Session</button>
+        <button class="timeout-btn secondary" onclick="logout()">Logout</button>
+    </div>
+
+    <!-- ========== MAIN APP ========== -->
+    <div id="appContainer" style="display:none;">
+        <!-- ========== TOP BAR ========== -->
+        <div class="topbar">
+            <div class="topbar-left">
+                <div class="logo">TRANSITOPS</div>
+                <div class="user-info">
+                    <span>User:</span>
+                    <span class="user-name" id="currentUser">Admin</span>
+                </div>
+            </div>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+
+        <!-- ========== SIDEBAR ========== -->
+        <div class="sidebar">
+            <button class="nav-btn active" data-page="dashboard" onclick="showPage('dashboard')">
+                <span class="nav-icon">📊</span> Dashboard
+            </button>
+            <button class="nav-btn" data-page="vehicles" onclick="showPage('vehicles')">
+                <span class="nav-icon">🚚</span> Vehicles
+            </button>
+            <button class="nav-btn" data-page="documents" onclick="showPage('documents')">
+                <span class="nav-icon">📄</span> RC & Documents
+            </button>
+            <button class="nav-btn" data-page="drivers" onclick="showPage('drivers')">
+                <span class="nav-icon">👤</span> Drivers
+            </button>
+            <button class="nav-btn" data-page="insurance" onclick="showPage('insurance')">
+                <span class="nav-icon">🛡️</span> Insurance
+            </button>
+            <button class="nav-btn" data-page="routes" onclick="showPage('routes')">
+                <span class="nav-icon">🗺️</span> Routes
+            </button>
+            <button class="nav-btn" data-page="fuel" onclick="showPage('fuel')">
+                <span class="nav-icon">⛽</span> Fuel
+            </button>
+            <button class="nav-btn" data-page="chalans" onclick="showPage('chalans')">
+                <span class="nav-icon">📋</span> Chalans
+            </button>
+            <button class="nav-btn" data-page="cleanup" onclick="showPage('cleanup')">
+                <span class="nav-icon">🧹</span> Driver Cleanup
+            </button>
+        </div>
+
+        <!-- ========== MAIN CONTENT ========== -->
+        <div class="main-wrapper">
+
+            <!-- ========== DASHBOARD ========== -->
+            <div class="page active" id="dashboardPage">
+                <div class="panel-header">
+                    <h2>Fleet Dashboard</h2>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Active Vehicles</div>
+                        <div class="stat-value" id="statVehicles">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Active Drivers</div>
+                        <div class="stat-value" id="statDrivers">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Routes Active</div>
+                        <div class="stat-value" id="statRoutes">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Pending Chalans</div>
+                        <div class="stat-value" id="statChalans">0</div>
+                    </div>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Driver Status Alert</h2>
+                    </div>
+                    <div id="driverAlerts"></div>
+                </div>
+                <div class="panel">
+                    <div class="chart-container">
+                        <canvas id="chartUtil"></canvas>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div class="panel">
+                        <div class="chart-container">
+                            <canvas id="chartCost"></canvas>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="chart-container">
+                            <canvas id="chartROI"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== VEHICLES ========== -->
+            <div class="page" id="vehiclesPage">
+                <div class="panel-header">
+                    <h2>Fleet Vehicles</h2>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Add Vehicle</h2>
+                    </div>
+                    <div class="alert alert-danger" id="vehicleError"></div>
+                    <div class="alert alert-success" id="vehicleSuccess"></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Vehicle ID</label>
+                            <input type="text" id="newVehicleId" placeholder="e.g. TR-001">
+                        </div>
+                        <div class="form-group">
+                            <label>Model</label>
+                            <input type="text" id="newVehicleModel" placeholder="e.g. Tata 1214">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="newVehicleStatus">
+                                <option value="active">Active</option>
+                                <option value="maintenance">Maintenance</option>
+                                <option value="retired">Retired</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="addVehicle()">Add Vehicle</button>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Vehicle List</h2>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Model</th>
+                                    <th>Status</th>
+                                    <th>Mileage</th>
+                                    <th>Next Service</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vehicleTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== RC & DOCUMENTS ========== -->
+            <div class="page" id="documentsPage">
+                <div class="panel-header">
+                    <h2>Vehicle RC & Documents</h2>
+                </div>
+
+                <!-- Document Status Overview -->
+                <div class="insurance-status-grid">
+                    <div class="insurance-stat-card">
+                        <div class="insurance-stat-label">Total Documents</div>
+                        <div class="insurance-stat-value" id="totalDocuments">0</div>
+                    </div>
+                    <div class="insurance-stat-card">
+                        <div class="insurance-stat-label">Valid</div>
+                        <div class="insurance-stat-value" id="validDocuments">0</div>
+                    </div>
+                    <div class="insurance-stat-card">
+                        <div class="insurance-stat-label">Expiring Soon</div>
+                        <div class="insurance-stat-value" id="expiringDocuments">0</div>
+                    </div>
+                    <div class="insurance-stat-card">
+                        <div class="insurance-stat-label">Expired</div>
+                        <div class="insurance-stat-value" id="expiredDocuments">0</div>
+                    </div>
+                </div>
+
+                <!-- Document Alerts -->
+                <div id="documentAlerts"></div>
+
+                <!-- Add Document -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Add RC / Document</h2>
+                    </div>
+                    <div class="alert alert-danger" id="documentError"></div>
+                    <div class="alert alert-success" id="documentSuccess"></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Vehicle</label>
+                            <select id="newDocVehicle"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Document Type</label>
+                            <select id="newDocType">
+                                <option value="RC">Registration Certificate (RC)</option>
+                                <option value="Permit">Permit</option>
+                                <option value="Fitness Certificate">Fitness Certificate</option>
+                                <option value="PUC">Pollution Under Control (PUC)</option>
+                                <option value="Road Tax">Road Tax Receipt</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Document Number</label>
+                            <input type="text" id="newDocNumber" placeholder="e.g. RJ14-RC-889021">
+                        </div>
+                        <div class="form-group">
+                            <label>Issuing Authority</label>
+                            <input type="text" id="newDocAuthority" placeholder="e.g. RTO Jaipur">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Issue Date</label>
+                            <input type="date" id="newDocIssueDate">
+                        </div>
+                        <div class="form-group">
+                            <label>Expiry Date</label>
+                            <input type="date" id="newDocExpiryDate">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Upload File (Optional)</label>
+                            <input type="file" id="newDocFile" accept=".pdf,.jpg,.jpeg,.png">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="addDocument()">Save Document</button>
+                </div>
+
+                <!-- Documents List -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Documents on File</h2>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Vehicle</th>
+                                    <th>Document</th>
+                                    <th>Number</th>
+                                    <th>Authority</th>
+                                    <th>Expiry Date</th>
+                                    <th>Status</th>
+                                    <th>File</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="documentsTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== DRIVERS ========== -->
+            <div class="page" id="driversPage">
+                <div class="panel-header">
+                    <h2>Driver Management</h2>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Add Driver</h2>
+                    </div>
+                    <div class="alert alert-danger" id="driverError"></div>
+                    <div class="alert alert-success" id="driverSuccess"></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Driver ID</label>
+                            <input type="text" id="newDriverId" placeholder="e.g. DR-001">
+                        </div>
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="newDriverName" placeholder="e.g. Rajesh Kumar">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>License Number</label>
+                            <input type="text" id="newDriverLicenseNo" placeholder="e.g. RJ1234567">
+                        </div>
+                        <div class="form-group">
+                            <label>License Expiry</label>
+                            <input type="date" id="newDriverExp">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="addDriver()">Add Driver</button>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Driver List</h2>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>License</th>
+                                    <th>License Expiry</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="driverTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== INSURANCE ========== -->
+            <div class="page" id="insurancePage">
+                <div class="panel-header">
+                    <h2>Insurance Management</h2>
+                </div>
+
+                <!-- Insurance Status Overview -->
+                <div class="insurance-status-grid">
+                    <div class="insurance-stat-card">
+                        <div class="insurance-stat-label">Total Policies</div>
+                        <div class="insurance-stat-value" id="totalInsurance">0</div>
+                    </div>
+                    <div class="insurance-stat-card">
+                        <div class="insurance-stat-label">Active</div>
+                        <div class="insurance-stat-value" id="activeInsurance">0</div>
+                    </div>
+                    <div class="insurance-stat-card">
+                        <div class="insurance-stat-label">Expiring Soon</div>
+                        <div class="insurance-stat-value" id="expiringInsurance">0</div>
+                    </div>
+                    <div class="insurance-stat-card">
+                        <div class="insurance-stat-label">Expired</div>
+                        <div class="insurance-stat-value" id="expiredInsurance">0</div>
+                    </div>
+                    <div class="insurance-stat-card">
+                        <div class="insurance-stat-label">Pending Premiums</div>
+                        <div class="insurance-stat-value" id="pendingPremiums">0</div>
+                    </div>
+                </div>
+
+                <!-- Insurance Alerts -->
+                <div id="insuranceAlerts"></div>
+
+                <!-- Add Insurance Policy -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Add Insurance Policy</h2>
+                    </div>
+                    <div class="alert alert-danger" id="insuranceError"></div>
+                    <div class="alert alert-success" id="insuranceSuccess"></div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Vehicle</label>
+                            <select id="insVehicle"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Insurance Provider</label>
+                            <input type="text" id="insProvider" placeholder="e.g. ICICI, HDFC, Bajaj">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Policy Number</label>
+                            <input type="text" id="insPolicyNo" placeholder="e.g. POL-2024-001">
+                        </div>
+                        <div class="form-group">
+                            <label>Policy Type</label>
+                            <select id="insPolicyType">
+                                <option value="">Select Policy Type</option>
+                                <option value="Third Party">Third Party Liability</option>
+                                <option value="Comprehensive">Comprehensive</option>
+                                <option value="Standalone OD">Standalone OD</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Premium Amount (₹)</label>
+                            <input type="number" id="insPremium" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Coverage Amount (₹)</label>
+                            <input type="number" id="insCoverage" placeholder="0">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Start Date</label>
+                            <input type="date" id="insStartDate">
+                        </div>
+                        <div class="form-group">
+                            <label>Expiry Date</label>
+                            <input type="date" id="insExpiryDate">
+                        </div>
+                    </div>
+
+                    <div class="form-row full">
+                        <div class="form-group">
+                            <label>Terms & Conditions</label>
+                            <textarea id="insTerms" placeholder="Note any special terms or conditions"></textarea>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="addInsurance()">Add Insurance Policy</button>
+                </div>
+
+                <!-- Insurance Policies List -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Insurance Policies</h2>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Vehicle</th>
+                                    <th>Provider</th>
+                                    <th>Policy Number</th>
+                                    <th>Type</th>
+                                    <th>Premium</th>
+                                    <th>Coverage</th>
+                                    <th>Expiry Date</th>
+                                    <th>Status</th>
+                                    <th>Premium Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="insuranceTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Insurance Claims -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>File Insurance Claim</h2>
+                    </div>
+                    <div class="alert alert-danger" id="claimError"></div>
+                    <div class="alert alert-success" id="claimSuccess"></div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Vehicle</label>
+                            <select id="claimVehicle"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Policy Number</label>
+                            <input type="text" id="claimPolicyNo" placeholder="Policy number">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Claim Amount (₹)</label>
+                            <input type="number" id="claimAmount" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Claim Date</label>
+                            <input type="date" id="claimDate">
+                        </div>
+                    </div>
+
+                    <div class="form-row full">
+                        <div class="form-group">
+                            <label>Incident Description</label>
+                            <textarea id="claimDescription" placeholder="Describe the incident..."></textarea>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="addClaim()">File Claim</button>
+                </div>
+
+                <!-- Insurance Claims History -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Claims History</h2>
+                    </div>
+                    <div id="claimsHistory">
+                        <p style="color:var(--muted);font-size:12px;">No claims filed yet</p>
+                    </div>
+                </div>
+
+                <!-- Renewal Reminders -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Upcoming Renewals (Next 30 Days)</h2>
+                    </div>
+                    <div id="renewalReminders">
+                        <p style="color:var(--muted);font-size:12px;">No renewals due in next 30 days</p>
+                    </div>
+                </div>
+            </div>
+            <div class="page" id="routesPage">
+                <div class="panel-header">
+                    <h2>Route Management</h2>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Create Route</h2>
+                    </div>
+                    <div class="alert alert-danger" id="routeError"></div>
+                    <div class="alert alert-success" id="routeSuccess"></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Route ID</label>
+                            <input type="text" id="newRouteId" placeholder="e.g. RT-001">
+                        </div>
+                        <div class="form-group">
+                            <label>Customer</label>
+                            <input type="text" id="newRouteCustomer" placeholder="e.g. ABC Corp">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>From</label>
+                            <input type="text" id="newRouteFrom" placeholder="e.g. Jaipur">
+                        </div>
+                        <div class="form-group">
+                            <label>To</label>
+                            <input type="text" id="newRouteTo" placeholder="e.g. Delhi">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Distance (km)</label>
+                            <input type="number" id="newRouteDistance" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Time (hours)</label>
+                            <input type="number" id="newRouteTime" placeholder="0">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="newRouteStatus">
+                                <option value="active">Active</option>
+                                <option value="pending">Pending</option>
+                                <option value="completed">Completed</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="addRoute()">Create Route</button>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Route List</h2>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>From</th>
+                                    <th>To</th>
+                                    <th>Distance</th>
+                                    <th>Time</th>
+                                    <th>Customer</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="routeTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== FUEL ========== -->
+            <div class="page" id="fuelPage">
+                <div class="panel-header">
+                    <h2>Fuel Management</h2>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Log Fuel Entry</h2>
+                    </div>
+                    <div class="alert alert-danger" id="fuelError"></div>
+                    <div class="alert alert-success" id="fuelSuccess"></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Vehicle</label>
+                            <select id="newFuelVehicle"></select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Liters</label>
+                            <input type="number" id="newFuelLiters" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label>KM Traveled</label>
+                            <input type="number" id="newFuelKm" placeholder="0">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="addFuel()">Log Entry</button>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Fuel Efficiency</h2>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chartFuel"></canvas>
+                    </div>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Fuel Log History</h2>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Vehicle</th>
+                                    <th>Liters</th>
+                                    <th>KM</th>
+                                    <th>Efficiency (km/l)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fuelTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== CHALANS ========== -->
+            <div class="page" id="chalansPage">
+                <div class="panel-header">
+                    <h2>Chalan Management</h2>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Record Chalan</h2>
+                    </div>
+                    <div class="alert alert-danger" id="chalanError"></div>
+                    <div class="alert alert-success" id="chalanSuccess"></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Driver</label>
+                            <select id="newChalanDriver"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Vehicle</label>
+                            <select id="newChalanVehicle"></select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Violation Type</label>
+                            <select id="newChalanType">
+                                <option value="">Select Violation</option>
+                                <option value="Speeding">Speeding</option>
+                                <option value="Wrong Lane">Wrong Lane</option>
+                                <option value="Red Light">Red Light</option>
+                                <option value="No Helmet">No Helmet</option>
+                                <option value="No Documents">No Documents</option>
+                                <option value="Parking Violation">Parking Violation</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Fine Amount (₹)</label>
+                            <input type="number" id="newChalanFine" placeholder="0">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Location</label>
+                            <input type="text" id="newChalanLocation" placeholder="e.g. Highway 44, Near Jaipur">
+                        </div>
+                        <div class="form-group">
+                            <label>Date</label>
+                            <input type="date" id="newChalanDate">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="newChalanStatus">
+                                <option value="pending">Pending</option>
+                                <option value="paid">Paid</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="addChalan()">Record Chalan</button>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Chalan Records</h2>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Driver</th>
+                                    <th>Vehicle</th>
+                                    <th>Violation</th>
+                                    <th>Location</th>
+                                    <th>Fine</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="chalansTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== DRIVER CLEANUP ========== -->
+            <div class="page" id="cleanupPage">
+                <div class="panel-header">
+                    <h2>Driver Cleanup & Maintenance</h2>
+                </div>
+
+                <!-- SUSPENDED DRIVERS -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Suspended Drivers</h2>
+                    </div>
+                    <div class="driver-cleanup-section">
+                        <p style="margin:0;font-size:12px;color:var(--muted);">
+                            These drivers have been marked as suspended and can be automatically removed from the
+                            system.
+                        </p>
+                        <div class="cleanup-count" id="suspendedCount">
+                            Suspended drivers: <strong>0</strong>
+                        </div>
+                        <div class="cleanup-buttons">
+                            <button class="btn btn-danger" onclick="showSuspendedDrivers()">View Suspended</button>
+                            <button class="btn btn-danger" onclick="autoRemoveSuspendedDrivers()">Auto-Remove
+                                All</button>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>License</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="suspendedTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- EXPIRED LICENSE DRIVERS -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Expired License Drivers</h2>
+                    </div>
+                    <div class="driver-cleanup-section">
+                        <p style="margin:0;font-size:12px;color:var(--muted);">
+                            These drivers' licenses have expired and they should be removed from active duty.
+                        </p>
+                        <div class="cleanup-count" id="expiredCount">
+                            Expired licenses: <strong>0</strong>
+                        </div>
+                        <div class="cleanup-buttons">
+                            <button class="btn btn-danger" onclick="showExpiredDrivers()">View Expired</button>
+                            <button class="btn btn-danger" onclick="autoRemoveExpiredDrivers()">Auto-Remove All</button>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>License</th>
+                                    <th>Expiry Date</th>
+                                    <th>Days Expired</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expiredTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- CLEANUP SUMMARY -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Cleanup Summary</h2>
+                    </div>
+                    <div id="cleanupSummary">
+                        <p style="color:var(--muted);font-size:12px;">
+                            <strong>Total drivers removed today:</strong> <span id="totalRemoved"
+                                style="color:var(--amber);">0</span>
+                        </p>
+                        <p style="color:var(--muted);font-size:12px;">
+                            <strong>Last cleanup:</strong> <span id="lastCleanup"
+                                style="color:var(--blue);">Never</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ========== PAYMENT MODAL ========== -->
+    <div class="modal" id="paymentModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Pay Chalan</h3>
+                <button class="modal-close" onclick="closePaymentModal()">&times;</button>
+            </div>
+            <div class="payment-summary">
+                <div class="summary-row">
+                    <span>Chalan ID:</span>
+                    <span id="paymentChalanId" style="font-weight:600;">---</span>
+                </div>
+                <div class="summary-row">
+                    <span>Driver:</span>
+                    <span id="paymentDriver">---</span>
+                </div>
+                <div class="summary-row">
+                    <span>Violation:</span>
+                    <span id="paymentViolation">---</span>
+                </div>
+                <div class="summary-row summary-total">
+                    <span>Amount Due:</span>
+                    <span>₹<span id="paymentAmount">0</span></span>
+                </div>
+            </div>
+            <div class="payment-form">
+                <div class="form-group">
+                    <label>Payment Method</label>
+                </div>
+                <div class="payment-method">
+                    <input type="radio" name="paymentMethod" value="cash" checked onclick="toggleUpiQr()">
+                    <label>Cash Payment</label>
+                </div>
+                <div class="payment-method">
+                    <input type="radio" name="paymentMethod" value="online" onclick="toggleUpiQr()">
+                    <label>Online Transfer</label>
+                </div>
+                <div class="payment-method">
+                    <input type="radio" name="paymentMethod" value="upi" onclick="toggleUpiQr()">
+                    <label>UPI (Scan QR)</label>
+                </div>
+                <div class="payment-method">
+                    <input type="radio" name="paymentMethod" value="cheque" onclick="toggleUpiQr()">
+                    <label>Cheque</label>
+                </div>
+
+                <div class="upi-qr-box" id="upiQrBox">
+                    <div class="upi-qr-code" id="upiQrCode"></div>
+                    <div class="upi-qr-amount">₹<span id="upiQrAmount">0</span></div>
+                    <div class="upi-qr-id">transitops.fleet@upi</div>
+                    <div class="upi-qr-hint">Scan with any UPI app (GPay, PhonePe, Paytm) to pay the chalan fine,
+                        then confirm below.</div>
+                </div>
+
+                <div class="form-group" style="margin-top:16px;">
+                    <label>Reference Number (Optional)</label>
+                    <input type="text" id="paymentReference" placeholder="Transaction ID / Cheque No">
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="paymentNotes" placeholder="Add payment notes..."></textarea>
+                </div>
+                <div class="btn-group" style="margin-top:16px;gap:8px;">
+                    <button class="btn btn-success" onclick="processPayment()" style="flex:1;">Confirm Payment</button>
+                    <button class="btn btn-secondary" onclick="closePaymentModal()" style="flex:1;">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== INSURANCE PREMIUM PAYMENT MODAL ========== -->
+    <div class="modal" id="insurancePaymentModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Pay Insurance Premium</h3>
+                <button class="modal-close" onclick="closeInsurancePaymentModal()">&times;</button>
+            </div>
+            <div class="payment-summary">
+                <div class="summary-row">
+                    <span>Policy ID:</span>
+                    <span id="insPaymentPolicyId" style="font-weight:600;">---</span>
+                </div>
+                <div class="summary-row">
+                    <span>Vehicle:</span>
+                    <span id="insPaymentVehicle">---</span>
+                </div>
+                <div class="summary-row">
+                    <span>Provider:</span>
+                    <span id="insPaymentProvider">---</span>
+                </div>
+                <div class="summary-row summary-total">
+                    <span>Premium Due:</span>
+                    <span>₹<span id="insPaymentAmount">0</span></span>
+                </div>
+            </div>
+            <div class="payment-form">
+                <div class="form-group">
+                    <label>Payment Method</label>
+                </div>
+                <div class="payment-method">
+                    <input type="radio" name="insPaymentMethod" value="cash" checked onclick="toggleInsuranceUpiQr()">
+                    <label>Cash Payment</label>
+                </div>
+                <div class="payment-method">
+                    <input type="radio" name="insPaymentMethod" value="online" onclick="toggleInsuranceUpiQr()">
+                    <label>Online Transfer</label>
+                </div>
+                <div class="payment-method">
+                    <input type="radio" name="insPaymentMethod" value="upi" onclick="toggleInsuranceUpiQr()">
+                    <label>UPI (Scan QR)</label>
+                </div>
+                <div class="payment-method">
+                    <input type="radio" name="insPaymentMethod" value="cheque" onclick="toggleInsuranceUpiQr()">
+                    <label>Cheque</label>
+                </div>
+
+                <div class="upi-qr-box" id="insUpiQrBox">
+                    <div class="upi-qr-code" id="insUpiQrCode"></div>
+                    <div class="upi-qr-amount">₹<span id="insUpiQrAmount">0</span></div>
+                    <div class="upi-qr-id">transitops.fleet@upi</div>
+                    <div class="upi-qr-hint">Scan with any UPI app (GPay, PhonePe, Paytm) to pay the insurance
+                        premium, then confirm below.</div>
+                </div>
+
+                <div class="form-group" style="margin-top:16px;">
+                    <label>Reference Number (Optional)</label>
+                    <input type="text" id="insPaymentReference" placeholder="Transaction ID / Cheque No">
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="insPaymentNotes" placeholder="Add payment notes..."></textarea>
+                </div>
+                <div class="btn-group" style="margin-top:16px;gap:8px;">
+                    <button class="btn btn-success" onclick="processInsurancePayment()" style="flex:1;">Confirm
+                        Payment</button>
+                    <button class="btn btn-secondary" onclick="closeInsurancePaymentModal()"
+                        style="flex:1;">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== DATA ==========
+        let vehicles = [];
+        let drivers = [];
+        let routes = [];
+        let fuelLogs = [];
+        let chalans = [];
+        let insurance = [];
+        let claims = [];
+        let documents = [];
+        let vehicleCounter = 1;
+        let driverCounter = 1;
+        let chalanCounter = 1;
+        let insuranceCounter = 1;
+        let claimCounter = 1;
+        let documentCounter = 1;
+        let totalRemovedToday = 0;
+        let lastCleanupTime = null;
+
+        // Auth
+        let currentRole = null;
+        let currentUser = null;
+        let sessionTimeout = null;
+
+        // Permissions
+        const permissions = {
+            admin: ['manage_vehicles', 'manage_drivers', 'manage_routes', 'manage_fuel', 'manage_chalans', 'manage_cleanup'],
+            manager: ['manage_vehicles', 'manage_drivers', 'manage_routes', 'manage_fuel', 'manage_chalans', 'manage_cleanup'],
+            driver: ['view_vehicles', 'view_routes', 'view_chalans']
+        };
+
+        // ========== AUTH ==========
+        function handleLogin() {
+            const role = document.getElementById('roleSelect').value;
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const errorEl = document.getElementById('authError');
+
+            errorEl.classList.remove('show');
+
+            if (!username || !password) {
+                errorEl.textContent = '❌ Enter username and password';
+                errorEl.classList.add('show');
+                return;
+            }
+
+            // Simple validation
+            if (password.length < 4) {
+                errorEl.textContent = '❌ Invalid credentials';
+                errorEl.classList.add('show');
+                return;
+            }
+
+            currentRole = role;
+            currentUser = username;
+            document.getElementById('currentUser').textContent = username;
+
+            // Save if remembered
+            if (document.getElementById('rememberMe').checked) {
+                localStorage.setItem('transitops_user', username);
+                localStorage.setItem('transitops_role', role);
+            } else {
+                localStorage.removeItem('transitops_user');
+                localStorage.removeItem('transitops_role');
+            }
+
+            document.getElementById('authContainer').style.display = 'none';
+            document.getElementById('appContainer').style.display = 'block';
+
+            // Initialize data
+            initializeData();
+            renderAll();
+            startSessionTimeout();
+        }
+
+        function loadRememberedLogin() {
+            const user = localStorage.getItem('transitops_user');
+            const role = localStorage.getItem('transitops_role');
+            if (user && role) {
+                document.getElementById('roleSelect').value = role;
+                document.getElementById('username').value = user;
+                document.getElementById('rememberMe').checked = true;
+            }
+        }
+
+        function logout() {
+            currentRole = null;
+            currentUser = null;
+            clearTimeout(sessionTimeout);
+            document.getElementById('authContainer').style.display = 'flex';
+            document.getElementById('appContainer').style.display = 'none';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('authError').classList.remove('show');
+        }
+
+        function canAccess(permission) {
+            if (!currentRole) return false;
+            return permissions[currentRole].includes(permission);
+        }
+
+        function startSessionTimeout() {
+            clearTimeout(sessionTimeout);
+            sessionTimeout = setTimeout(() => {
+                showSessionWarning();
+            }, 14 * 60 * 1000); // 14 minutes
+        }
+
+        function showSessionWarning() {
+            document.getElementById('timeoutWarning').classList.add('show');
+            let countdown = 60;
+            const interval = setInterval(() => {
+                document.getElementById('countdown').textContent = countdown--;
+                if (countdown < 0) {
+                    clearInterval(interval);
+                    logout();
+                }
+            }, 1000);
+        }
+
+        function extendSession() {
+            document.getElementById('timeoutWarning').classList.remove('show');
+            startSessionTimeout();
+        }
+
+        // ========== INITIALIZATION ==========
+        function initializeData() {
+            vehicles = [
+                { id: 'TR-001', model: 'Tata 1214', status: 'active', mileage: 12500, nextService: '2025-03-15' },
+                { id: 'TR-002', model: 'Mahindra Bolero', status: 'active', mileage: 8350, nextService: '2025-04-22' }
+            ];
+
+            documents = [
+                { id: 'DOC-001', vehicle: 'TR-001', docType: 'RC', docNumber: 'RJ14-RC-889021', authority: 'RTO Jaipur', issueDate: '2022-02-10', expiryDate: '2037-02-10', fileName: null, fileDataUrl: null },
+                { id: 'DOC-002', vehicle: 'TR-001', docType: 'PUC', docNumber: 'PUC-RJ14-4471', authority: 'Authorized Testing Center', issueDate: '2026-04-15', expiryDate: '2026-08-01', fileName: null, fileDataUrl: null },
+                { id: 'DOC-003', vehicle: 'TR-002', docType: 'Fitness Certificate', docNumber: 'FIT-RJ14-2209', authority: 'RTO Jaipur', issueDate: '2024-01-05', expiryDate: '2025-01-05', fileName: null, fileDataUrl: null }
+            ];
+
+            drivers = [
+                { id: 'DR-001', name: 'Rajesh Kumar', licenseNo: 'RJ1234567', issueDate: '2020-01-15', exp: '2025-01-15', status: 'active-driver' },
+                { id: 'DR-002', name: 'Priya Singh', licenseNo: 'RJ7654321', issueDate: '2021-06-20', exp: '2026-06-20', status: 'active-driver' },
+                { id: 'DR-003', name: 'Amit Patel', licenseNo: 'GJ1111111', issueDate: '2019-03-10', exp: '2024-03-10', status: 'suspended' },
+                { id: 'DR-004', name: 'Vikram Das', licenseNo: 'DL2222222', issueDate: '2018-11-05', exp: '2024-11-05', status: 'active-driver' }
+            ];
+
+            routes = [
+                { id: 'RT-001', from: 'Jaipur', to: 'Delhi', distance: 240, time: 5, customer: 'ABC Logistics', status: 'active' },
+                { id: 'RT-002', from: 'Jaipur', to: 'Udaipur', distance: 410, time: 7.5, customer: 'XYZ Corp', status: 'active' }
+            ];
+
+            fuelLogs = [
+                { vehicle: 'TR-001', liters: 50, km: 420 },
+                { vehicle: 'TR-002', liters: 45, km: 360 }
+            ];
+
+            chalans = [
+                { id: 'CHN-001', driver: 'DR-001', driverName: 'Rajesh Kumar', vehicle: 'TR-001', violationType: 'Speeding', location: 'Highway 44', fineAmount: 500, date: '2024-12-15', status: 'pending' },
+                { id: 'CHN-002', driver: 'DR-002', driverName: 'Priya Singh', vehicle: 'TR-002', violationType: 'Wrong Lane', location: 'Main Road', fineAmount: 300, date: '2024-12-16', status: 'paid' }
+            ];
+
+            insurance = [
+                { id: 'INS-001', vehicle: 'TR-001', provider: 'ICICI Lombard', policyNo: 'POL-2024-001', type: 'Comprehensive', premium: 25000, coverage: 500000, startDate: '2024-01-15', expiryDate: '2025-01-15', terms: 'Full coverage with zero depreciation', premiumStatus: 'paid' },
+                { id: 'INS-002', vehicle: 'TR-002', provider: 'Bajaj Allianz', policyNo: 'POL-2024-002', type: 'Third Party', premium: 8000, coverage: 100000, startDate: '2024-06-20', expiryDate: '2026-06-20', terms: 'Standard third party coverage', premiumStatus: 'pending' }
+            ];
+
+            claims = [];
+        }
+
+        // ========== NAVIGATION ==========
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(pageId + 'Page').classList.add('active');
+            event.target.closest('.nav-btn').classList.add('active');
+
+            if (pageId === 'cleanup') {
+                updateCleanupPage();
+            }
+        }
+
+        // ========== RENDER FUNCTIONS ==========
+        function renderAll() {
+            renderVehicles();
+            renderDrivers();
+            renderRoutes();
+            renderFuel();
+            renderChalans();
+            renderInsurance();
+            renderDocuments();
+            updateDashboard();
+            populateChalanSelects();
+            populateFuelVehicleSelect();
+            populateInsuranceVehicleSelect();
+            populateDocumentVehicleSelect();
+        }
+
+        function renderVehicles() {
+            const tbody = document.getElementById('vehicleTable');
+            tbody.innerHTML = vehicles.map(v => `
+    <tr>
+      <td>${v.id}</td>
+      <td>${v.model}</td>
+      <td><span class="pill" style="background:var(--green-dim);color:var(--green);">${v.status}</span></td>
+      <td>${v.mileage}km</td>
+      <td>${v.nextService}</td>
+    </tr>
+  `).join('');
+        }
+
+        function renderDrivers() {
+            const tbody = document.getElementById('driverTable');
+            tbody.innerHTML = drivers.map(d => {
+                const exp = new Date(d.exp);
+                const today = new Date();
+                const isExpired = exp < today;
+                const statusClass = isExpired ? 'expired-license' : d.status;
+                return `
+    <tr>
+      <td>${d.id}</td>
+      <td>${d.name}</td>
+      <td>${d.licenseNo}</td>
+      <td>${d.exp}</td>
+      <td><span class="pill ${statusClass}"><span class="lamp"></span>${isExpired ? 'Expired' : d.status}</span></td>
+    </tr>
+    `;
+            }).join('');
+        }
+
+        function renderRoutes() {
+            const tbody = document.getElementById('routeTable');
+            tbody.innerHTML = routes.map(r => `
+    <tr>
+      <td>${r.id}</td>
+      <td>${r.from}</td>
+      <td>${r.to}</td>
+      <td>${r.distance}km</td>
+      <td>${r.time}h</td>
+      <td>${r.customer}</td>
+      <td><span class="pill" style="background:var(--green-dim);color:var(--green);">${r.status}</span></td>
+    </tr>
+  `).join('');
+        }
+
+        function renderFuel() {
+            const tbody = document.getElementById('fuelTable');
+            tbody.innerHTML = fuelLogs.map(f => `
+    <tr>
+      <td>${f.vehicle}</td>
+      <td>${f.liters}L</td>
+      <td>${f.km}km</td>
+      <td>${(f.km / f.liters).toFixed(2)} km/l</td>
+    </tr>
+  `).join('');
+        }
+
+        function renderChalans() {
+            const tbody = document.getElementById('chalansTable');
+            tbody.innerHTML = chalans.map(c => `
+    <tr>
+      <td>${c.id}</td>
+      <td>${c.driverName}</td>
+      <td>${c.vehicle}</td>
+      <td>${c.violationType}</td>
+      <td>${c.location}</td>
+      <td>₹${c.fineAmount}</td>
+      <td><span class="pill ${c.status}"><span class="lamp"></span>${c.status}</span></td>
+      <td>
+        ${c.status === 'pending' ? `<button class="btn btn-small btn-success" onclick="openPaymentModal('${c.id}')">Pay</button>` : '✓ Paid'}
+      </td>
+    </tr>
+  `).join('');
+        }
+
+        // ========== INSURANCE FUNCTIONS ==========
+        function getInsuranceStatus(expiryDate) {
+            const today = new Date();
+            const expiry = new Date(expiryDate);
+            const daysLeft = Math.floor((expiry - today) / (1000 * 60 * 60 * 24));
+
+            if (daysLeft < 0) return 'expired';
+            if (daysLeft <= 30) return 'expiring-soon';
+            return 'active';
+        }
+
+        function renderInsurance() {
+            const tbody = document.getElementById('insuranceTable');
+            const today = new Date();
+
+            tbody.innerHTML = insurance.map(i => {
+                const status = getInsuranceStatus(i.expiryDate);
+                const statusClass = status === 'expired' ? 'expired' : status === 'expiring-soon' ? 'expiring-soon' : '';
+                const statusText = status === 'expired' ? 'Expired' : status === 'expiring-soon' ? 'Expiring Soon' : 'Active';
+                const premStatus = i.premiumStatus || 'pending';
+
+                return `
+    <tr>
+      <td>${i.vehicle}</td>
+      <td>${i.provider}</td>
+      <td>${i.policyNo}</td>
+      <td>${i.type}</td>
+      <td>₹${i.premium}</td>
+      <td>₹${i.coverage}</td>
+      <td>${i.expiryDate}</td>
+      <td><span class="insurance-status ${statusClass}"><span class="lamp"></span>${statusText}</span></td>
+      <td><span class="pill ${premStatus}"><span class="lamp"></span>${premStatus}</span></td>
+      <td>
+        <button class="btn btn-small btn-secondary" onclick="viewInsuranceDetails('${i.id}')">Details</button>
+        ${premStatus === 'pending' ? `<button class="btn btn-small btn-success" onclick="openInsurancePaymentModal('${i.id}')">Pay</button>` : ''}
+      </td>
+    </tr>
+    `;
+            }).join('');
+
+            updateInsuranceStats();
+            updateInsuranceAlerts();
+            renderRenewalReminders();
+            renderClaimsHistory();
+        }
+
+        function updateInsuranceStats() {
+            const today = new Date();
+            const active = insurance.filter(i => getInsuranceStatus(i.expiryDate) === 'active').length;
+            const expiringSoon = insurance.filter(i => getInsuranceStatus(i.expiryDate) === 'expiring-soon').length;
+            const expired = insurance.filter(i => getInsuranceStatus(i.expiryDate) === 'expired').length;
+            const pendingPremiums = insurance.filter(i => (i.premiumStatus || 'pending') === 'pending').length;
+
+            document.getElementById('totalInsurance').textContent = insurance.length;
+            document.getElementById('activeInsurance').textContent = active;
+            document.getElementById('expiringInsurance').textContent = expiringSoon;
+            document.getElementById('expiredInsurance').textContent = expired;
+            document.getElementById('pendingPremiums').textContent = pendingPremiums;
+        }
+
+        function updateInsuranceAlerts() {
+            const today = new Date();
+            const expiredList = insurance.filter(i => getInsuranceStatus(i.expiryDate) === 'expired');
+            const expiringList = insurance.filter(i => getInsuranceStatus(i.expiryDate) === 'expiring-soon');
+
+            const alertsDiv = document.getElementById('insuranceAlerts');
+            let html = '';
+
+            if (expiredList.length > 0) {
+                html += `<div class="insurance-alert">🔴 <strong>${expiredList.length} policies EXPIRED</strong> - Immediate renewal required for: ${expiredList.map(i => i.vehicle).join(', ')}</div>`;
+            }
+
+            if (expiringList.length > 0) {
+                html += `<div class="insurance-alert warning">⚠️ <strong>${expiringList.length} policies expiring soon</strong> - Renewal due for: ${expiringList.map(i => i.vehicle).join(', ')}</div>`;
+            }
+
+            if (html === '') {
+                html = '<div class="insurance-alert success">✓ All insurance policies are active and valid</div>';
+            }
+
+            alertsDiv.innerHTML = html;
+        }
+
+        // ========== RC & DOCUMENTS ==========
+        function getDocumentStatus(expiryDate) {
+            return getInsuranceStatus(expiryDate);
+        }
+
+        function renderDocuments() {
+            const tbody = document.getElementById('documentsTable');
+            if (!tbody) return;
+
+            tbody.innerHTML = documents.map(d => {
+                const status = getDocumentStatus(d.expiryDate);
+                const statusClass = status === 'expired' ? 'expired' : status === 'expiring-soon' ? 'expiring-soon' : '';
+                const statusText = status === 'expired' ? 'Expired' : status === 'expiring-soon' ? 'Expiring Soon' : 'Valid';
+
+                return `
+    <tr>
+      <td>${d.vehicle}</td>
+      <td>${d.docType}</td>
+      <td>${d.docNumber}</td>
+      <td>${d.authority || '—'}</td>
+      <td>${d.expiryDate}</td>
+      <td><span class="insurance-status ${statusClass}"><span class="lamp"></span>${statusText}</span></td>
+      <td>${d.fileName ? `<button class="btn btn-small btn-secondary" onclick="viewDocumentFile('${d.id}')">${d.fileName}</button>` : '—'}</td>
+      <td><button class="btn btn-small btn-danger" onclick="deleteDocument('${d.id}')">Delete</button></td>
+    </tr>
+    `;
+            }).join('');
+
+            updateDocumentStats();
+            updateDocumentAlerts();
+        }
+
+        function updateDocumentStats() {
+            const valid = documents.filter(d => getDocumentStatus(d.expiryDate) === 'active').length;
+            const expiringSoon = documents.filter(d => getDocumentStatus(d.expiryDate) === 'expiring-soon').length;
+            const expired = documents.filter(d => getDocumentStatus(d.expiryDate) === 'expired').length;
+
+            document.getElementById('totalDocuments').textContent = documents.length;
+            document.getElementById('validDocuments').textContent = valid;
+            document.getElementById('expiringDocuments').textContent = expiringSoon;
+            document.getElementById('expiredDocuments').textContent = expired;
+        }
+
+        function updateDocumentAlerts() {
+            const expiredList = documents.filter(d => getDocumentStatus(d.expiryDate) === 'expired');
+            const expiringList = documents.filter(d => getDocumentStatus(d.expiryDate) === 'expiring-soon');
+
+            const alertsDiv = document.getElementById('documentAlerts');
+            let html = '';
+
+            if (expiredList.length > 0) {
+                html += `<div class="insurance-alert">🔴 <strong>${expiredList.length} document(s) EXPIRED</strong> - Renewal required: ${expiredList.map(d => `${d.vehicle} (${d.docType})`).join(', ')}</div>`;
+            }
+
+            if (expiringList.length > 0) {
+                html += `<div class="insurance-alert warning">⚠️ <strong>${expiringList.length} document(s) expiring soon</strong> - Renewal due: ${expiringList.map(d => `${d.vehicle} (${d.docType})`).join(', ')}</div>`;
+            }
+
+            if (html === '') {
+                html = '<div class="insurance-alert success">✓ All vehicle documents are valid</div>';
+            }
+
+            alertsDiv.innerHTML = html;
+        }
+
+        function addDocument() {
+            if (!canAccess('manage_vehicles')) {
+                alert('No permission');
+                return;
+            }
+            const vehicle = document.getElementById('newDocVehicle').value;
+            const docType = document.getElementById('newDocType').value;
+            const docNumber = document.getElementById('newDocNumber').value.trim();
+            const authority = document.getElementById('newDocAuthority').value.trim();
+            const issueDate = document.getElementById('newDocIssueDate').value;
+            const expiryDate = document.getElementById('newDocExpiryDate').value;
+            const fileInput = document.getElementById('newDocFile');
+            const file = fileInput.files[0];
+
+            if (!vehicle || !docType || !docNumber || !issueDate || !expiryDate) {
+                showError('documentError', 'Fill in all required fields.');
+                return;
+            }
+            if (new Date(issueDate) >= new Date(expiryDate)) {
+                showError('documentError', 'Expiry date must be after issue date.');
+                return;
+            }
+
+            const id = `DOC-${String(documentCounter++).padStart(3, '0')}`;
+            const saveDoc = (fileName, fileDataUrl) => {
+                documents.push({ id, vehicle, docType, docNumber, authority, issueDate, expiryDate, fileName, fileDataUrl });
+                showSuccess(`✓ ${docType} saved for ${vehicle}`);
+                document.getElementById('newDocNumber').value = '';
+                document.getElementById('newDocAuthority').value = '';
+                document.getElementById('newDocIssueDate').value = '';
+                document.getElementById('newDocExpiryDate').value = '';
+                fileInput.value = '';
+                renderDocuments();
+            };
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => saveDoc(file.name, e.target.result);
+                reader.readAsDataURL(file);
+            } else {
+                saveDoc(null, null);
+            }
+        }
+
+        function viewDocumentFile(docId) {
+            const doc = documents.find(d => d.id === docId);
+            if (!doc || !doc.fileDataUrl) return;
+            const win = window.open();
+            if (doc.fileDataUrl.startsWith('data:image')) {
+                win.document.write(`<title>${doc.fileName}</title><body style="margin:0;background:#14171a;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${doc.fileDataUrl}" style="max-width:100%;max-height:100vh;"></body>`);
+            } else {
+                win.document.write(`<title>${doc.fileName}</title><iframe src="${doc.fileDataUrl}" style="border:0;width:100%;height:100vh;"></iframe>`);
+            }
+        }
+
+        function deleteDocument(docId) {
+            if (!canAccess('manage_vehicles')) {
+                alert('No permission');
+                return;
+            }
+            const doc = documents.find(d => d.id === docId);
+            if (!doc) return;
+            if (!confirm(`Delete ${doc.docType} (${doc.docNumber}) for ${doc.vehicle}?`)) return;
+
+            documents = documents.filter(d => d.id !== docId);
+            renderDocuments();
+            showSuccess(`✓ Document removed`);
+        }
+
+        function renderRenewalReminders() {
+            const today = new Date();
+            const thirtyDaysLater = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+            const renewalList = insurance.filter(i => {
+                const expiry = new Date(i.expiryDate);
+                return expiry >= today && expiry <= thirtyDaysLater;
+            });
+
+            const container = document.getElementById('renewalReminders');
+            if (renewalList.length === 0) {
+                container.innerHTML = '<p style="color:var(--muted);font-size:12px;">No renewals due in next 30 days</p>';
+            } else {
+                container.innerHTML = renewalList.map(i => {
+                    const daysLeft = Math.floor((new Date(i.expiryDate) - today) / (1000 * 60 * 60 * 24));
+                    return `
+      <div class="insurance-card">
+        <div class="insurance-card-header">
+          <div class="insurance-card-title">📅 ${i.vehicle} - ${i.provider}</div>
+          <span style="color:var(--amber);font-weight:600;">${daysLeft} days left</span>
+        </div>
+        <div class="insurance-details">
+          <div class="detail-row">
+            <span class="detail-label">Policy:</span>
+            <span class="detail-value">${i.policyNo}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Type:</span>
+            <span class="detail-value">${i.type}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Premium:</span>
+            <span class="detail-value">₹${i.premium}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Expires:</span>
+            <span class="detail-value">${i.expiryDate}</span>
+          </div>
+        </div>
+        <div class="insurance-actions">
+          <button class="btn btn-small btn-primary" onclick="renewInsurance('${i.id}')">Renew Now</button>
+          <button class="btn btn-small btn-secondary" onclick="viewInsuranceDetails('${i.id}')">View Details</button>
+        </div>
+      </div>
+      `;
+                }).join('');
+            }
+        }
+
+        function renderClaimsHistory() {
+            const container = document.getElementById('claimsHistory');
+            if (claims.length === 0) {
+                container.innerHTML = '<p style="color:var(--muted);font-size:12px;">No claims filed yet</p>';
+            } else {
+                container.innerHTML = claims.map(c => `
+      <div class="claim-record">
+        <div style="margin-bottom:4px;">
+          <strong>${c.vehicle}</strong> - Claim #${c.id}
+          <span class="claim-status ${c.status}">${c.status}</span>
+        </div>
+        <div style="margin-bottom:4px;">Policy: ${c.policyNo} | Amount: ₹${c.amount}</div>
+        <div style="margin-bottom:4px;">Date Filed: ${c.claimDate}</div>
+        <div>${c.description}</div>
+      </div>
+    `).join('');
+            }
+        }
+
+        function viewInsuranceDetails(insuranceId) {
+            const ins = insurance.find(i => i.id === insuranceId);
+            if (!ins) return;
+
+            const daysLeft = Math.floor((new Date(ins.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
+            alert(`
+Insurance Details
+━━━━━━━━━━━━━━━━━━━━━
+Vehicle: ${ins.vehicle}
+Provider: ${ins.provider}
+Policy #: ${ins.policyNo}
+Type: ${ins.type}
+Premium: ₹${ins.premium}
+Premium Status: ${(ins.premiumStatus || 'pending').toUpperCase()}
+Coverage: ₹${ins.coverage}
+Issued: ${ins.startDate}
+Expires: ${ins.expiryDate}
+Days Left: ${daysLeft}
+Terms: ${ins.terms}
+  `);
+        }
+
+        function renewInsurance(insuranceId) {
+            if (!canAccess('manage_vehicles')) {
+                alert('No permission');
+                return;
+            }
+            const ins = insurance.find(i => i.id === insuranceId);
+            if (!ins) return;
+
+            const newExpiryDate = prompt(`Enter new expiry date for ${ins.vehicle} (YYYY-MM-DD):`, ins.expiryDate);
+            if (!newExpiryDate) return;
+
+            const newPremium = prompt('Enter renewal premium amount (₹):', ins.premium);
+            if (!newPremium) return;
+
+            ins.expiryDate = newExpiryDate;
+            ins.premium = parseInt(newPremium);
+            ins.startDate = new Date().toISOString().split('T')[0];
+            ins.premiumStatus = 'pending';
+
+            renderInsurance();
+            showSuccess(`✓ Insurance renewed for ${ins.vehicle} until ${newExpiryDate}`);
+        }
+
+        function addInsurance() {
+            if (!canAccess('manage_vehicles')) {
+                alert('No permission');
+                return;
+            }
+            const vehicle = document.getElementById('insVehicle').value;
+            const provider = document.getElementById('insProvider').value.trim();
+            const policyNo = document.getElementById('insPolicyNo').value.trim();
+            const policyType = document.getElementById('insPolicyType').value;
+            const premium = parseFloat(document.getElementById('insPremium').value);
+            const coverage = parseFloat(document.getElementById('insCoverage').value);
+            const startDate = document.getElementById('insStartDate').value;
+            const expiryDate = document.getElementById('insExpiryDate').value;
+            const terms = document.getElementById('insTerms').value.trim();
+
+            if (!vehicle || !provider || !policyNo || !policyType || !premium || !coverage || !startDate || !expiryDate) {
+                showError('insuranceError', 'Fill in all required fields.');
+                return;
+            }
+
+            if (new Date(startDate) >= new Date(expiryDate)) {
+                showError('insuranceError', 'Expiry date must be after start date.');
+                return;
+            }
+
+            const id = `INS-${String(insuranceCounter++).padStart(3, '0')}`;
+            insurance.push({ id, vehicle, provider, policyNo, type: policyType, premium, coverage, startDate, expiryDate, terms, premiumStatus: 'pending' });
+
+            showSuccess(`✓ Insurance policy added for ${vehicle}`);
+            document.getElementById('insVehicle').value = '';
+            document.getElementById('insProvider').value = '';
+            document.getElementById('insPolicyNo').value = '';
+            document.getElementById('insPolicyType').value = '';
+            document.getElementById('insPremium').value = '';
+            document.getElementById('insCoverage').value = '';
+            document.getElementById('insStartDate').value = '';
+            document.getElementById('insExpiryDate').value = '';
+            document.getElementById('insTerms').value = '';
+
+            renderInsurance();
+        }
+
+        function addClaim() {
+            if (!canAccess('manage_vehicles')) {
+                alert('No permission');
+                return;
+            }
+            const vehicle = document.getElementById('claimVehicle').value;
+            const policyNo = document.getElementById('claimPolicyNo').value.trim();
+            const amount = parseFloat(document.getElementById('claimAmount').value);
+            const claimDate = document.getElementById('claimDate').value;
+            const description = document.getElementById('claimDescription').value.trim();
+
+            if (!vehicle || !policyNo || !amount || !claimDate || !description) {
+                showError('claimError', 'Fill in all required fields.');
+                return;
+            }
+
+            const id = `CLM-${String(claimCounter++).padStart(3, '0')}`;
+            claims.push({ id, vehicle, policyNo, amount, claimDate, description, status: 'pending', filedDate: new Date().toISOString().split('T')[0] });
+
+            showSuccess(`✓ Claim ${id} filed for ₹${amount}`);
+            document.getElementById('claimVehicle').value = '';
+            document.getElementById('claimPolicyNo').value = '';
+            document.getElementById('claimAmount').value = '';
+            document.getElementById('claimDate').value = '';
+            document.getElementById('claimDescription').value = '';
+
+            renderInsurance();
+        }
+
+        function populateInsuranceVehicleSelect() {
+            const select1 = document.getElementById('insVehicle');
+            const select2 = document.getElementById('claimVehicle');
+            const options = '<option value="">Select Vehicle</option>' + vehicles.map(v => `<option value="${v.id}">${v.id} - ${v.model}</option>`).join('');
+            if (select1) select1.innerHTML = options;
+            if (select2) select2.innerHTML = options;
+        }
+
+        function populateDocumentVehicleSelect() {
+            const select = document.getElementById('newDocVehicle');
+            if (select) {
+                select.innerHTML = '<option value="">Select Vehicle</option>' + vehicles.map(v => `<option value="${v.id}">${v.id} - ${v.model}</option>`).join('');
+            }
+        }
+
+        function renderSuspendedDrivers() {
+            const suspended = drivers.filter(d => d.status === 'suspended');
+            const tbody = document.getElementById('suspendedTable');
+            tbody.innerHTML = suspended.map(d => `
+    <tr>
+      <td>${d.id}</td>
+      <td>${d.name}</td>
+      <td>${d.licenseNo}</td>
+      <td><span class="pill suspended">Suspended</span></td>
+      <td><button class="btn btn-small btn-danger" onclick="removeSuspendedDriver('${d.id}')">Remove</button></td>
+    </tr>
+  `).join('');
+            document.getElementById('suspendedCount').innerHTML = `Suspended drivers: <strong>${suspended.length}</strong>`;
+        }
+
+        function renderExpiredDrivers() {
+            const today = new Date();
+            const expired = drivers.filter(d => {
+                const exp = new Date(d.exp);
+                return exp < today;
+            });
+            const tbody = document.getElementById('expiredTable');
+            tbody.innerHTML = expired.map(d => {
+                const exp = new Date(d.exp);
+                const daysExpired = Math.floor((today - exp) / (1000 * 60 * 60 * 24));
+                return `
+    <tr>
+      <td>${d.id}</td>
+      <td>${d.name}</td>
+      <td>${d.licenseNo}</td>
+      <td>${d.exp}</td>
+      <td style="color:var(--red);">${daysExpired} days</td>
+      <td><button class="btn btn-small btn-danger" onclick="removeExpiredDriver('${d.id}')">Remove</button></td>
+    </tr>
+    `;
+            }).join('');
+            document.getElementById('expiredCount').innerHTML = `Expired licenses: <strong>${expired.length}</strong>`;
+        }
+
+        function updateDashboard() {
+            document.getElementById('statVehicles').textContent = vehicles.length;
+            document.getElementById('statDrivers').textContent = drivers.filter(d => d.status !== 'suspended' && new Date(d.exp) > new Date()).length;
+            document.getElementById('statRoutes').textContent = routes.filter(r => r.status === 'active').length;
+            document.getElementById('statChalans').textContent = chalans.filter(c => c.status === 'pending').length;
+
+            // Driver alerts
+            const today = new Date();
+            const alerts = [];
+            drivers.forEach(d => {
+                if (d.status === 'suspended') alerts.push(`⚠️ ${d.name} is suspended`);
+                if (new Date(d.exp) < today) alerts.push(`🔴 ${d.name}'s license expired on ${d.exp}`);
+            });
+
+            // Insurance alerts
+            insurance.forEach(i => {
+                const status = getInsuranceStatus(i.expiryDate);
+                if (status === 'expired') alerts.push(`🔴 ${i.vehicle} insurance EXPIRED (${i.expiryDate})`);
+                if (status === 'expiring-soon') alerts.push(`⚠️ ${i.vehicle} insurance expiring on ${i.expiryDate}`);
+            });
+
+            const alertsDiv = document.getElementById('driverAlerts');
+            alertsDiv.innerHTML = alerts.length ? alerts.map(a => `<div class="alert alert-warning show" style="margin-bottom:8px;">${a}</div>`).join('') : '<p style="color:var(--muted);font-size:12px;">No alerts</p>';
+
+            renderCharts();
+        }
+
+        // ========== CLEANUP FUNCTIONS ==========
+        function showSuspendedDrivers() {
+            renderSuspendedDrivers();
+        }
+
+        function showExpiredDrivers() {
+            renderExpiredDrivers();
+        }
+
+        function removeSuspendedDriver(driverId) {
+            if (!canAccess('manage_cleanup')) {
+                alert('No permission');
+                return;
+            }
+            drivers = drivers.filter(d => d.id !== driverId);
+            totalRemovedToday++;
+            lastCleanupTime = new Date().toLocaleTimeString();
+            renderSuspendedDrivers();
+            renderAll();
+            updateCleanupPage();
+            showSuccess('Driver removed successfully!');
+        }
+
+        function removeExpiredDriver(driverId) {
+            if (!canAccess('manage_cleanup')) {
+                alert('No permission');
+                return;
+            }
+            drivers = drivers.filter(d => d.id !== driverId);
+            totalRemovedToday++;
+            lastCleanupTime = new Date().toLocaleTimeString();
+            renderExpiredDrivers();
+            renderAll();
+            updateCleanupPage();
+            showSuccess('Driver removed successfully!');
+        }
+
+        function autoRemoveSuspendedDrivers() {
+            if (!canAccess('manage_cleanup')) {
+                alert('No permission');
+                return;
+            }
+            const count = drivers.filter(d => d.status === 'suspended').length;
+            if (count === 0) {
+                alert('No suspended drivers to remove');
+                return;
+            }
+            if (!confirm(`Remove ${count} suspended driver(s)? This action cannot be undone.`)) return;
+
+            drivers = drivers.filter(d => d.status !== 'suspended');
+            totalRemovedToday += count;
+            lastCleanupTime = new Date().toLocaleTimeString();
+            renderSuspendedDrivers();
+            renderAll();
+            updateCleanupPage();
+            showSuccess(`✓ ${count} suspended driver(s) removed`);
+        }
+
+        function autoRemoveExpiredDrivers() {
+            if (!canAccess('manage_cleanup')) {
+                alert('No permission');
+                return;
+            }
+            const today = new Date();
+            const expiredList = drivers.filter(d => new Date(d.exp) < today);
+            const count = expiredList.length;
+
+            if (count === 0) {
+                alert('No expired drivers to remove');
+                return;
+            }
+            if (!confirm(`Remove ${count} driver(s) with expired licenses? This action cannot be undone.`)) return;
+
+            drivers = drivers.filter(d => new Date(d.exp) >= today);
+            totalRemovedToday += count;
+            lastCleanupTime = new Date().toLocaleTimeString();
+            renderExpiredDrivers();
+            renderAll();
+            updateCleanupPage();
+            showSuccess(`✓ ${count} driver(s) with expired licenses removed`);
+        }
+
+        function updateCleanupPage() {
+            renderSuspendedDrivers();
+            renderExpiredDrivers();
+            document.getElementById('totalRemoved').textContent = totalRemovedToday;
+            document.getElementById('lastCleanup').textContent = lastCleanupTime || 'Never';
+        }
+
+        // ========== PAYMENT MODAL ==========
+        let currentPaymentChalanId = null;
+
+        function openPaymentModal(chalanId) {
+            if (!canAccess('manage_chalans')) {
+                alert('No permission');
+                return;
+            }
+            const chalan = chalans.find(c => c.id === chalanId);
+            if (!chalan) return;
+
+            currentPaymentChalanId = chalanId;
+            document.getElementById('paymentChalanId').textContent = chalan.id;
+            document.getElementById('paymentDriver').textContent = chalan.driverName;
+            document.getElementById('paymentViolation').textContent = chalan.violationType;
+            document.getElementById('paymentAmount').textContent = chalan.fineAmount;
+            document.getElementById('paymentReference').value = '';
+            document.getElementById('paymentNotes').value = '';
+            document.querySelector('input[name="paymentMethod"][value="cash"]').checked = true;
+            document.getElementById('upiQrBox').classList.remove('active');
+
+            document.getElementById('paymentModal').classList.add('active');
+        }
+
+        function toggleUpiQr() {
+            const method = document.querySelector('input[name="paymentMethod"]:checked').value;
+            const box = document.getElementById('upiQrBox');
+            if (method !== 'upi') {
+                box.classList.remove('active');
+                return;
+            }
+            const chalan = chalans.find(c => c.id === currentPaymentChalanId);
+            if (!chalan) return;
+
+            box.classList.add('active');
+            document.getElementById('upiQrAmount').textContent = chalan.fineAmount;
+
+            const upiLink = `upi://pay?pa=transitops.fleet@upi&pn=TransitOps&am=${chalan.fineAmount}&tn=Chalan%20${chalan.id}&cu=INR`;
+            const qrEl = document.getElementById('upiQrCode');
+            qrEl.innerHTML = '';
+            if (window.QRCode) {
+                new QRCode(qrEl, {
+                    text: upiLink,
+                    width: 150,
+                    height: 150,
+                    colorDark: '#14171a',
+                    colorLight: '#ffffff'
+                });
+            }
+        }
+
+        function closePaymentModal() {
+            document.getElementById('paymentModal').classList.remove('active');
+            currentPaymentChalanId = null;
+        }
+
+        function processPayment() {
+            if (!currentPaymentChalanId) return;
+
+            const method = document.querySelector('input[name="paymentMethod"]:checked').value;
+            const reference = document.getElementById('paymentReference').value.trim();
+            const notes = document.getElementById('paymentNotes').value.trim();
+
+            const chalan = chalans.find(c => c.id === currentPaymentChalanId);
+            if (!chalan) return;
+
+            // Update chalan status
+            chalan.status = 'paid';
+            chalan.paymentMethod = method;
+            chalan.paymentReference = reference;
+            chalan.paymentNotes = notes;
+            chalan.paidDate = new Date().toISOString().split('T')[0];
+
+            renderChalans();
+            updateDashboard();
+            closePaymentModal();
+            showSuccess(`✓ Payment of ₹${chalan.fineAmount} processed for ${chalan.id}`);
+        }
+
+        // ========== INSURANCE PREMIUM PAYMENT ==========
+        let currentPaymentInsuranceId = null;
+
+        function openInsurancePaymentModal(insuranceId) {
+            if (!canAccess('manage_vehicles')) {
+                alert('No permission');
+                return;
+            }
+            const ins = insurance.find(i => i.id === insuranceId);
+            if (!ins) return;
+
+            currentPaymentInsuranceId = insuranceId;
+            document.getElementById('insPaymentPolicyId').textContent = ins.id;
+            document.getElementById('insPaymentVehicle').textContent = ins.vehicle;
+            document.getElementById('insPaymentProvider').textContent = ins.provider;
+            document.getElementById('insPaymentAmount').textContent = ins.premium;
+            document.getElementById('insPaymentReference').value = '';
+            document.getElementById('insPaymentNotes').value = '';
+            document.querySelector('input[name="insPaymentMethod"][value="cash"]').checked = true;
+            document.getElementById('insUpiQrBox').classList.remove('active');
+
+            document.getElementById('insurancePaymentModal').classList.add('active');
+        }
+
+        function closeInsurancePaymentModal() {
+            document.getElementById('insurancePaymentModal').classList.remove('active');
+            currentPaymentInsuranceId = null;
+        }
+
+        function toggleInsuranceUpiQr() {
+            const method = document.querySelector('input[name="insPaymentMethod"]:checked').value;
+            const box = document.getElementById('insUpiQrBox');
+            if (method !== 'upi') {
+                box.classList.remove('active');
+                return;
+            }
+            const ins = insurance.find(i => i.id === currentPaymentInsuranceId);
+            if (!ins) return;
+
+            box.classList.add('active');
+            document.getElementById('insUpiQrAmount').textContent = ins.premium;
+
+            const upiLink = `upi://pay?pa=transitops.fleet@upi&pn=TransitOps&am=${ins.premium}&tn=Insurance%20${ins.id}&cu=INR`;
+            const qrEl = document.getElementById('insUpiQrCode');
+            qrEl.innerHTML = '';
+            if (window.QRCode) {
+                new QRCode(qrEl, {
+                    text: upiLink,
+                    width: 150,
+                    height: 150,
+                    colorDark: '#14171a',
+                    colorLight: '#ffffff'
+                });
+            }
+        }
+
+        function processInsurancePayment() {
+            if (!currentPaymentInsuranceId) return;
+
+            const method = document.querySelector('input[name="insPaymentMethod"]:checked').value;
+            const reference = document.getElementById('insPaymentReference').value.trim();
+            const notes = document.getElementById('insPaymentNotes').value.trim();
+
+            const ins = insurance.find(i => i.id === currentPaymentInsuranceId);
+            if (!ins) return;
+
+            ins.premiumStatus = 'paid';
+            ins.paymentMethod = method;
+            ins.paymentReference = reference;
+            ins.paymentNotes = notes;
+            ins.paidDate = new Date().toISOString().split('T')[0];
+
+            renderInsurance();
+            closeInsurancePaymentModal();
+            showSuccess(`✓ Premium payment of ₹${ins.premium} processed for ${ins.id}`);
+        }
+
+        // ========== ADD FUNCTIONS ==========
+        function addVehicle() {
+            if (!canAccess('manage_vehicles')) {
+                alert('❌ No permission');
+                return;
+            }
+            const id = document.getElementById('newVehicleId').value.trim();
+            const model = document.getElementById('newVehicleModel').value.trim();
+            const status = document.getElementById('newVehicleStatus').value;
+
+            if (!id || !model) { showError('vehicleError', 'Fill in all fields.'); return; }
+            if (vehicles.some(v => v.id.toLowerCase() === id.toLowerCase())) {
+                showError('vehicleError', `Vehicle ${id} already exists.`); return;
+            }
+
+            vehicles.push({ id, model, status, mileage: 0, nextService: '2027-01-01' });
+            showSuccess('vehicleSuccess', `✓ Vehicle ${id} added`);
+            document.getElementById('newVehicleId').value = '';
+            document.getElementById('newVehicleModel').value = '';
+            renderVehicles();
+            populateFuelVehicleSelect();
+            populateVehicleSelects();
+        }
+
+        function addDriver() {
+            if (!canAccess('manage_drivers')) {
+                alert('❌ No permission');
+                return;
+            }
+            const id = document.getElementById('newDriverId').value.trim();
+            const name = document.getElementById('newDriverName').value.trim();
+            const licenseNo = document.getElementById('newDriverLicenseNo').value.trim();
+            const exp = document.getElementById('newDriverExp').value;
+
+            if (!id || !name || !licenseNo || !exp) { showError('driverError', 'Fill in all fields.'); return; }
+            if (drivers.some(d => d.id.toLowerCase() === id.toLowerCase())) {
+                showError('driverError', `${id} already exists.`); return;
+            }
+
+            drivers.push({ id, name, licenseNo, issueDate: '2024-01-01', exp, status: 'active-driver' });
+            showSuccess('driverSuccess', `✓ ${name} added`);
+            document.getElementById('newDriverId').value = '';
+            document.getElementById('newDriverName').value = '';
+            document.getElementById('newDriverLicenseNo').value = '';
+            document.getElementById('newDriverExp').value = '';
+            renderDrivers();
+            populateDriverSelects();
+        }
+
+        function addRoute() {
+            if (!canAccess('manage_routes')) {
+                alert('❌ No permission');
+                return;
+            }
+            const id = document.getElementById('newRouteId').value.trim();
+            const from = document.getElementById('newRouteFrom').value.trim();
+            const to = document.getElementById('newRouteTo').value.trim();
+            const distance = parseFloat(document.getElementById('newRouteDistance').value);
+            const time = parseFloat(document.getElementById('newRouteTime').value);
+            const customer = document.getElementById('newRouteCustomer').value.trim();
+            const status = document.getElementById('newRouteStatus').value;
+
+            if (!id || !from || !to || !customer) { showError('routeError', 'Fill required fields.'); return; }
+            if (routes.some(r => r.id.toLowerCase() === id.toLowerCase())) {
+                showError('routeError', `Route ${id} exists.`); return;
+            }
+            if (isNaN(distance) || distance <= 0 || isNaN(time) || time <= 0) {
+                showError('routeError', 'Valid distance and time required.'); return;
+            }
+
+            routes.push({ id, from, to, distance, time, customer, status });
+            showSuccess('routeSuccess', `✓ Route ${id} created`);
+            document.getElementById('newRouteId').value = '';
+            document.getElementById('newRouteFrom').value = '';
+            document.getElementById('newRouteTo').value = '';
+            document.getElementById('newRouteDistance').value = '';
+            document.getElementById('newRouteTime').value = '';
+            document.getElementById('newRouteCustomer').value = '';
+            renderRoutes();
+        }
+
+        function addFuel() {
+            if (!canAccess('manage_fuel')) {
+                alert('❌ No permission');
+                return;
+            }
+            const vehicle = document.getElementById('newFuelVehicle').value;
+            const liters = parseFloat(document.getElementById('newFuelLiters').value);
+            const km = parseFloat(document.getElementById('newFuelKm').value);
+
+            if (!vehicle) { showError('fuelError', 'Select vehicle.'); return; }
+            if (isNaN(liters) || liters <= 0 || isNaN(km) || km <= 0) { showError('fuelError', 'Valid values required.'); return; }
+
+            fuelLogs.unshift({ vehicle, liters, km });
+            showSuccess('fuelSuccess', `✓ Entry logged — ${(km / liters).toFixed(2)} km/l`);
+            document.getElementById('newFuelLiters').value = '';
+            document.getElementById('newFuelKm').value = '';
+            renderFuel();
+            updateDashboard();
+        }
+
+        function addChalan() {
+            if (!canAccess('manage_chalans')) {
+                alert('❌ No permission');
+                return;
+            }
+            const driver = document.getElementById('newChalanDriver').value;
+            const vehicle = document.getElementById('newChalanVehicle').value;
+            const violationType = document.getElementById('newChalanType').value;
+            const location = document.getElementById('newChalanLocation').value.trim();
+            const fineAmount = parseFloat(document.getElementById('newChalanFine').value);
+            const date = document.getElementById('newChalanDate').value;
+            const status = document.getElementById('newChalanStatus').value;
+
+            if (!driver || !vehicle || !violationType || !location || !fineAmount || !date) {
+                showError('chalanError', 'Fill all fields.'); return;
+            }
+
+            const driverObj = drivers.find(d => d.id === driver);
+            const driverName = driverObj ? driverObj.name : 'Unknown';
+            const id = `CHN-${String(chalanCounter++).padStart(3, '0')}`;
+
+            chalans.push({ id, driver, driverName, vehicle, violationType, location, fineAmount, date, status });
+            showSuccess('chalanSuccess', `✓ Chalan ${id} logged`);
+            document.getElementById('newChalanDriver').value = '';
+            document.getElementById('newChalanVehicle').value = '';
+            document.getElementById('newChalanLocation').value = '';
+            document.getElementById('newChalanFine').value = '';
+            document.getElementById('newChalanDate').value = '';
+            renderChalans();
+            updateDashboard();
+        }
+
+        // ========== POPULATE SELECTS ==========
+        function populateDriverSelects() {
+            const select = document.getElementById('newChalanDriver');
+            if (select) {
+                select.innerHTML = '<option value="">Select Driver</option>' + drivers.map(d => `<option value="${d.id}">${d.name} (${d.id})</option>`).join('');
+            }
+        }
+
+        function populateVehicleSelects() {
+            const select = document.getElementById('newChalanVehicle');
+            if (select) {
+                select.innerHTML = '<option value="">Select Vehicle</option>' + vehicles.map(v => `<option value="${v.id}">${v.id}</option>`).join('');
+            }
+        }
+
+        function populateFuelVehicleSelect() {
+            const select = document.getElementById('newFuelVehicle');
+            if (select) {
+                select.innerHTML = '<option value="">Select Vehicle</option>' + vehicles.map(v => `<option value="${v.id}">${v.id}</option>`).join('');
+            }
+        }
+
+        function populateChalanSelects() {
+            populateDriverSelects();
+            populateVehicleSelects();
+        }
+
+        // ========== ALERTS ==========
+        function showError(id, message) {
+            const el = document.getElementById(id);
+            el.textContent = message;
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 4000);
+        }
+
+        function showSuccess(message) {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success show';
+            alert.textContent = message;
+            alert.style.position = 'fixed';
+            alert.style.top = '60px';
+            alert.style.right = '20px';
+            alert.style.zIndex = '1000';
+            alert.style.maxWidth = '300px';
+            document.body.appendChild(alert);
+            setTimeout(() => alert.remove(), 3000);
+        }
+
+        // ========== CHARTS ==========
+        let chartInstances = {};
+        function renderCharts() {
+            Object.values(chartInstances).forEach(c => c.destroy());
+            const gridColor = '#2c3238';
+            const textColor = '#8b9198';
+            Chart.defaults.color = textColor;
+
+            if (document.getElementById('chartUtil')) {
+                chartInstances.util = new Chart(document.getElementById('chartUtil'), {
+                    type: 'line',
+                    data: {
+                        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                        datasets: [{ label: 'Utilization %', data: [58, 63, 71, 66, 74, 52, 49], borderColor: '#f2a93b', backgroundColor: 'rgba(242,169,59,0.12)', tension: 0.35, fill: true }]
+                    },
+                    options: { plugins: { legend: { display: false } }, scales: { x: { grid: { color: gridColor } }, y: { grid: { color: gridColor } } } }
+                });
+            }
+
+            if (document.getElementById('chartCost')) {
+                chartInstances.cost = new Chart(document.getElementById('chartCost'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Fuel', 'Maintenance', 'Wages', 'Insurance'],
+                        datasets: [{ data: [38, 22, 31, 9], backgroundColor: ['#f2a93b', '#e4573d', '#5c9ee0', '#4cae6d'] }]
+                    },
+                    options: { plugins: { legend: { position: 'bottom' } } }
+                });
+            }
+
+            if (document.getElementById('chartFuel')) {
+                chartInstances.fuel = new Chart(document.getElementById('chartFuel'), {
+                    type: 'bar',
+                    data: {
+                        labels: fuelLogs.slice(0, 5).map(f => f.vehicle),
+                        datasets: [{ label: 'km/l', data: fuelLogs.slice(0, 5).map(f => +(f.km / f.liters).toFixed(2)), backgroundColor: '#4cae6d' }]
+                    },
+                    options: { plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { grid: { color: gridColor } } } }
+                });
+            }
+
+            if (document.getElementById('chartROI')) {
+                chartInstances.roi = new Chart(document.getElementById('chartROI'), {
+                    type: 'bar',
+                    data: {
+                        labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+                        datasets: [
+                            { label: 'Revenue', data: [420, 468, 501, 540], backgroundColor: '#5c9ee0' },
+                            { label: 'Cost', data: [310, 338, 352, 365], backgroundColor: '#e4573d' }
+                        ]
+                    },
+                    options: { plugins: { legend: { position: 'bottom' } }, scales: { x: { grid: { display: false } }, y: { grid: { color: gridColor } } } }
+                });
+            }
+        }
+
+        // Setup
+        window.addEventListener('load', () => {
+            loadRememberedLogin();
+        });
+    </script>
+</body>
+
+</html>
